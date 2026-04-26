@@ -14,6 +14,10 @@ from ..base_agent import BaseSource
 
 class PubmedSource(BaseSource):
     name = "pubmed"
+    # NCBI E-utilities: 3 req/s without an API key, 10 req/s with one. We cap
+    # at 2 concurrent to leave headroom for the search → fetch chain (each
+    # citation issues at least 2 sequential calls).
+    concurrency_limit = 2
 
     def __init__(self, config: PubmedConfig | None = None, http: HttpConfig | None = None) -> None:
         super().__init__(http=http)

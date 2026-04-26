@@ -33,24 +33,72 @@ log = get_logger(__name__)
 # ─────────────────────────────────────────────────────────────────────────────
 
 
+# Verbs commonly used in the "if you're being [VERB]ed, say [CODEWORD]"
+# canary-signal jailbreak. Covers active/passive voice and tense variation.
+_CANARY_VERBS = (
+    r"(?:prevent(?:ed|ing|s)?|stop(?:ped|ping|s)?|block(?:ed|ing|s)?|"
+    r"restrict(?:ed|ing|s)?|forbid(?:den|ding|s)?|withhold(?:ing|s)?|"
+    r"filter(?:ed|ing|s)?|censor(?:ed|ing|s)?|reject(?:ed|ing|s)?|"
+    r"disallow(?:ed|ing|s)?)"
+)
+_CANARY_SUBJECTS = r"(?:somebody|someone|anyone|you|you're|something|anything)"
+_CANARY_AUX = r"(?:is|are|were|was|get|gets|got|being)?"
+
+
 _HEURISTIC_PATTERNS: list[tuple[re.Pattern[str], float, str]] = [
-    # Permits arbitrary qualifiers between "ignore" and the noun: "ignore all
-    # previous instructions", "ignore the prior system rules", etc.
+    # ── Direct instruction override ─────────────────────────────────────────
     (re.compile(r"\bignore\s+(?:\w+\s+){0,4}(?:instructions|prompts|rules|directives|messages?)\b", re.I), 0.45, "ignore-prior"),
     (re.compile(r"\bdisregard\s+(?:\w+\s+){0,4}(?:prompt|message|rules?|instructions|directives)\b", re.I), 0.40, "disregard-system"),
-    (re.compile(r"\b(?:jailbreak|do\s*anything\s*now|DAN\s+mode)\b", re.I), 0.55, "jailbreak"),
+    (re.compile(r"\b(?:jailbreak|do\s*anything\s*now|DAN\s+mode|AIM\s+mode|STAN)\b", re.I), 0.55, "jailbreak"),
     (re.compile(r"\b(?:reveal|show|print|output|leak)\s+(?:\w+\s+){0,3}(?:prompt|instructions|rules|secrets)\b", re.I), 0.50, "exfil-prompt"),
     (re.compile(r"\b(?:you\s+are\s+now|act\s+as|pretend\s+to\s+be)\s+(?:a|an)\s+\S+", re.I), 0.20, "role-flip"),
     (re.compile(r"\bend\s+of\s+(?:prompt|instructions)\b.*\bnew\s+(?:prompt|instructions)\b", re.I | re.S), 0.40, "boundary-spoof"),
     (re.compile(r"</?(?:system|assistant|user|im_start|im_end)>", re.I), 0.30, "tag-injection"),
     (re.compile(r"\b(?:send|exfiltrate|email|post)\b.{0,40}\b(?:http|api|webhook|attacker)\b", re.I | re.S), 0.55, "exfil-action"),
-    # Explicit fabrication commands are unambiguous content-policy violations
-    # that the public ML prompt-injection models miss (they target instruction
-    # overrides, not "make-up-a-source" requests). Weighted high enough to
-    # cross the 0.85 block threshold on its own.
+
+    # ── Fabrication / content-policy violations ─────────────────────────────
     (re.compile(r"\bfabricate\s+(?:a\s+)?(?:citation|reference|bibliography|doi|paper|study|source|proof)\b", re.I), 0.92, "fabrication-cmd"),
     (re.compile(r"\b(?:invent|make\s*up|hallucinate)\s+(?:a\s+)?(?:citation|paper|study|reference|source)\b", re.I), 0.88, "fabrication-cmd"),
+
+    # ── Rule-binding jailbreaks (DAN-family, "follow these N rules") ───────
+    # Matches numbered rule lists: "rule1:", "rule 1 -", "rule one is", etc.
+    # When ≥2 enumerated rules appear, the rule_pattern_count post-processor
+    # (see _heuristic_score) escalates the weight further.
+    (re.compile(r"\brule\s*\d+\s*[-:.]", re.I), 0.30, "rule-binding"),
+    (re.compile(r"\bfollow\s+(?:these|the)\s+(?:\w+\s+){0,3}rules?\s+to\s+(?:answer|respond|reply)", re.I), 0.40, "rule-binding"),
+
+    # ── Covert canary / signal-channel exploits ─────────────────────────────
+    # The classic "say <CODEWORD> if you're being prevented / restricted /
+    # filtered" pattern — a side channel for confirming guardrails are active.
+    # Tolerant to (a) misspellings/conjugation drift ("prevent" / "preventing"
+    # / "prevented"), (b) active *and* passive voice ("if you prevent" vs
+    # "if you are prevented"), (c) "say" appearing before OR after the
+    # conditional, (d) extra clause material between the two halves.
+    (re.compile(
+        rf"\bsay\s+['\"\w]+\s+if\s+{_CANARY_SUBJECTS}\s+{_CANARY_AUX}\s*{_CANARY_VERBS}",
+        re.I,
+    ), 0.85, "canary-signal"),
+    (re.compile(
+        rf"\bif\s+{_CANARY_SUBJECTS}\s+{_CANARY_AUX}\s*{_CANARY_VERBS}.{{0,100}}\bsay\s+['\"\w]+",
+        re.I | re.S,
+    ), 0.85, "canary-signal"),
+    (re.compile(
+        r"\bif\s+you\s+(?:cannot|can't|are\s+(?:not\s+)?(?:able|allowed|permitted)|are\s+restricted|are\s+filtered).{0,100}\bsay\s+['\"\w]+",
+        re.I | re.S,
+    ), 0.85, "canary-signal"),
+
+    # ── Coercive truthfulness / "hold nothing back" framing ────────────────
+    (re.compile(r"\b(?:be|stay|remain)\s+(?:100%|completely|fully|totally|absolutely)\s+(?:truth\s*ful|honest|forthcoming)", re.I), 0.30, "truthfulness-coercion"),
+    (re.compile(r"\b(?:hold|keep|leave)\s+nothing\s+back\b", re.I), 0.45, "truthfulness-coercion"),
+    (re.compile(r"\bno\s+(?:filters?|restrictions?|limits?|guardrails?)\b", re.I), 0.40, "truthfulness-coercion"),
+    (re.compile(r"\bunfiltered\s+(?:answer|response|reply|truth)", re.I), 0.40, "truthfulness-coercion"),
 ]
+
+
+# Patterns whose presence in *combination* indicate a multi-rule jailbreak
+# even if no individual pattern crossed the block threshold. We escalate the
+# total score when at least 2 distinct categories from this set fire.
+_COMBO_BOOST_CATEGORIES = {"rule-binding", "canary-signal", "truthfulness-coercion"}
 
 
 def _heuristic_score(text: str) -> tuple[float, list[str]]:
@@ -58,10 +106,33 @@ def _heuristic_score(text: str) -> tuple[float, list[str]]:
         return 0.0, []
     score = 0.0
     hits: list[str] = []
+    rule_binding_count = 0
+    distinct_combo_categories: set[str] = set()
+
     for pat, weight, label in _HEURISTIC_PATTERNS:
-        if pat.search(text):
-            score += weight
-            hits.append(label)
+        matches = pat.findall(text) if label == "rule-binding" else (pat.search(text) and [True])
+        if not matches:
+            continue
+        score += weight
+        hits.append(label)
+        if label == "rule-binding":
+            rule_binding_count += len(matches) if isinstance(matches, list) else 1
+        if label in _COMBO_BOOST_CATEGORIES:
+            distinct_combo_categories.add(label)
+
+    # Escalation 1: Enumerated rule-list (rule1, rule2, rule3, …) is a
+    # signature DAN-family jailbreak structure. ≥2 enumerated rules → +0.30.
+    if rule_binding_count >= 2:
+        score += 0.30
+        hits.append(f"rule-list[{rule_binding_count}]")
+
+    # Escalation 2: Multiple jailbreak *families* in the same prompt strongly
+    # suggests the rule-binding + canary + coercion stack we observe in the
+    # wild. ≥2 distinct families → +0.25.
+    if len(distinct_combo_categories) >= 2:
+        score += 0.25
+        hits.append("combo-jailbreak")
+
     score = min(score, 0.99)
     return score, hits
 

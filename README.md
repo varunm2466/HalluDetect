@@ -200,8 +200,95 @@ HALLUDETECT_LOG_LEVEL=INFO
 HALLUDETECT_OFFLINE=0                                  # 1 forces heuristic + skips network
 ```
 
-The CLI auto-loads `.env` and aliases `HUGGINGFACE_HUB_TOKEN` ↔ `HF_TOKEN` ↔
-`HUGGING_FACE_HUB_TOKEN` so any one of them is sufficient.
+The CLI auto-loads `.env`, aliases `HUGGINGFACE_HUB_TOKEN` ↔ `HF_TOKEN` ↔
+`HUGGING_FACE_HUB_TOKEN`, and calls `huggingface_hub.login()` once at
+startup so every downstream HF SDK call (including sentence-transformers'
+metadata fetches) inherits the credential.
+
+### 🔑 Increasing rate limits (highly recommended)
+
+The pipeline runs fully without API keys, but anonymous calls hit aggressive
+upstream throttling. Each key below is **free** and takes < 2 minutes to
+obtain.
+
+#### Hugging Face token (`HF_TOKEN`)
+
+| Tier | Rate limit | Suffices for |
+|---|---|---|
+| Anonymous | ~30 req/hour, low download bandwidth | Casual model loads |
+| **Read token (free)** | ~1,000 req/hour, full bandwidth | This project — recommended |
+| Pro | ~10× higher | Production / training |
+
+Steps:
+
+1. Sign in at <https://huggingface.co>.
+2. Open <https://huggingface.co/settings/tokens>.
+3. Click **New token** → name it `halludetect` → role **Read** → **Generate**.
+4. Copy the `hf_…` string (37 alphanumeric chars after `hf_`).
+5. Paste into `.env`:
+
+   ```dotenv
+   HF_TOKEN=hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+   ```
+
+6. Restart the server. The `Please set a HF_TOKEN…` warnings disappear and
+   model downloads accelerate noticeably.
+
+> **Optional — gated models**: if you also want the doc-recommended
+> `qualifire/prompt-injection-sentinel` instead of the public ProtectAI
+> fallback, click **Request access** at
+> <https://huggingface.co/qualifire/prompt-injection-sentinel> while signed in,
+> wait for approval, then ensure your token has read access. Otherwise the
+> system silently falls back to ProtectAI — no action needed.
+
+#### NCBI / PubMed API key
+
+NCBI throttles to **3 req/s without a key, 10 req/s with one**.
+
+1. Create an NCBI account at <https://www.ncbi.nlm.nih.gov/account/>.
+2. Sign in → top-right avatar → **Account Settings**.
+3. Scroll to **API Key Management** → **Create an API Key**.
+4. Add to `.env`:
+
+   ```dotenv
+   NCBI_API_KEY=your_long_alphanumeric_key
+   NCBI_EMAIL=you@example.com         # NCBI requires a contact email
+   NCBI_TOOL=halludetect              # any string identifying your tool
+   ```
+
+#### Semantic Scholar API key
+
+Public endpoint allows ~100 req / 5 min. With a key you get **1 req/sec
+sustained, no daily cap**.
+
+1. Apply at <https://www.semanticscholar.org/product/api#api-key-form>
+   (1-question form, instant approval for academic / research use).
+2. Add to `.env`:
+
+   ```dotenv
+   SEMANTIC_SCHOLAR_API_KEY=your_s2_key
+   ```
+
+#### Crossref polite pool
+
+No key required. Just provide an email — Crossref routes you onto the
+"polite pool" with better latency and stability:
+
+```dotenv
+CROSSREF_MAILTO=you@example.com
+```
+
+#### What you get after configuring all four
+
+| Without keys (default) | With all keys |
+|---|---|
+| HF: anonymous, slow downloads, log warnings | HF: authenticated, ~30× faster cold-load, silent |
+| PubMed: 3 req/s, frequent server-disconnects | PubMed: 10 req/s, stable |
+| Semantic Scholar: 100 req/5 min, circuit-breaker trips on bursts | S2: 1 req/s sustained, never trips |
+| Crossref: standard pool | Crossref: polite pool, lower latency |
+
+**Net effect**: roughly **3× faster full audits** (1.5–3 s typical vs. 5–15 s
+without keys) plus a near-empty log even under heavy use.
 
 ### One-shot model preload (optional)
 

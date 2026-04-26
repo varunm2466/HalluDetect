@@ -131,6 +131,12 @@ def build_app():
             "threat": threat.model_dump(),
             "sentinel_hits": sentinel_result.hits,
             "sentinel_backend": sentinel_result.backend,
+            "config": {
+                "preset": req.preset,
+                "melon_threshold": pipe.config.security.melon.cosine_threshold,
+                "block_threshold": pipe.config.security.sentinel.block_threshold,
+                "abort_p_inj": pipe.config.scoring.policy.block_on_injection_prob,
+            },
             "duration_ms": (time.perf_counter() - t0) * 1000.0,
         }
 

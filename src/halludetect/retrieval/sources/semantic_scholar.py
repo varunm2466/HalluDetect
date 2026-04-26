@@ -15,6 +15,10 @@ _FIELDS = "title,authors,year,venue,externalIds,abstract,publicationTypes,public
 
 class SemanticScholarSource(BaseSource):
     name = "semantic_scholar"
+    # Public S2 endpoint allows ~100 requests / 5 min without an API key
+    # (≈ 0.33 req/s sustained). Keep concurrency low so the circuit breaker
+    # only fires for *real* exhaustion, not bursts.
+    concurrency_limit = 2
 
     def __init__(self, config: SemanticScholarConfig | None = None, http: HttpConfig | None = None) -> None:
         super().__init__(http=http)

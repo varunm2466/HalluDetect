@@ -27,6 +27,15 @@ _hf_token = next(
 if _hf_token:
     for alias in ("HF_TOKEN", "HUGGING_FACE_HUB_TOKEN", "HUGGINGFACE_HUB_TOKEN"):
         os.environ.setdefault(alias, _hf_token)
+    # Persist the token in the HF cache so EVERY downstream SDK call —
+    # including sentence-transformers' separate metadata fetch path that
+    # ignores per-call ``token=`` kwargs — picks it up automatically.
+    try:
+        from huggingface_hub import login as _hf_login  # type: ignore
+
+        _hf_login(token=_hf_token, add_to_git_credential=False, new_session=False)
+    except Exception:  # pragma: no cover — graceful even if token is invalid
+        pass
 
 from .config import load_config  # noqa: E402  (must follow load_dotenv)
 from .logging_setup import setup_logging  # noqa: E402

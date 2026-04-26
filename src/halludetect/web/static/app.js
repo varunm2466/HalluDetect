@@ -169,6 +169,12 @@ function renderThreat(payload) {
   els.pinjFill.style.width = `${(t.p_injection * 100).toFixed(1)}%`;
   els.pinjValue.textContent = fmt(t.p_injection, 3);
 
+  // Display the live MELON threshold returned by the backend so the UI
+  // always reflects the active config (default/strict/lenient or any custom
+  // YAML override) rather than a hardcoded placeholder.
+  const liveThreshold = payload.config?.melon_threshold ?? 0.25;
+  els.melonThreshold.textContent = liveThreshold.toFixed(2);
+
   els.bigVerdict.classList.remove("is-safe", "is-warning", "is-danger");
   if (t.blocked || t.p_injection >= 0.6) {
     els.bigVerdict.classList.add("is-danger");
