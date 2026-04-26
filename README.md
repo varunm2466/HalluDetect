@@ -82,46 +82,46 @@ combination behaves as designed.
 │                          InputDocument                               │
 └──────────────────────────────────────────────────────────────────────┘
                               │
-            ┌─────────────────▼──────────────────┐
-            │  L1 — Adversarial Threat Detection  │
-            │   • Sentinel ML  ▸ ProtectAI / qualifire (HF) │
-            │   • Sentinel heuristic ▸ regex content-policy │
-            │   • MELON       ▸ contrastive masked re-exec │
-            │      → P_inj                            │
-            └─────────────────┬──────────────────┘
+            ┌─────────────────▼──────────────────────────────┐
+            │  L1 — Adversarial Threat Detection             │
+            │   • Sentinel ML  ▸ ProtectAI / qualifire (HF)  │
+            │   • Sentinel heuristic ▸ regex content-policy  │
+            │   • MELON       ▸ contrastive masked re-exec   │
+            │      → P_inj                                   │
+            └─────────────────┬──────────────────────────────┘
                               │ (if blocked → score 5/100)
-            ┌─────────────────▼──────────────────┐
+            ┌─────────────────▼───────────────────┐
             │  L2 — Granular Claim Extraction     │
             │   • SRL → atomic (S, R, O) triplets │
             │   • Citation alignment              │
             │   • DeBERTa NLI entailment          │
             │   • Token entropy → U_intrinsic     │
-            └─────────────────┬──────────────────┘
+            └─────────────────┬───────────────────┘
                               │
-            ┌─────────────────▼──────────────────┐
+            ┌─────────────────▼───────────────────┐
             │  L3 — Multi-Agent Retrieval         │
             │   • Crossref · arXiv · S2 · PubMed  │
             │   • Cascaded multi-pass async       │
             │   • Liveness + Wayback CDX          │
             │   • LLM-as-Judge reasoner           │
             │   • Per-source 429 circuit-breaker  │
-            └─────────────────┬──────────────────┘
+            └─────────────────┬───────────────────┘
                               │
-            ┌─────────────────▼──────────────────┐
+            ┌─────────────────▼───────────────────┐
             │  L4 — Algorithmic Record Linkage    │
             │   • Enhanced Jaro–Winkler           │
             │   • Rabin-Karp rolling hash         │
             │   • Field-weighted similarity       │
             │   • Manifestation hierarchy         │
             │     (Journal > Conference > arXiv)  │
-            └─────────────────┬──────────────────┘
+            └─────────────────┬───────────────────┘
                               │
-            ┌─────────────────▼──────────────────┐
+            ┌─────────────────▼───────────────────┐
             │  L5 — Scoring & Correction          │
             │   • Policy-Gated Rewrite engine     │
             │   • Patches: BibTeX/JSON/Markdown   │
             │   • HRS Safety Score (0–100)        │
-            └─────────────────┬──────────────────┘
+            └─────────────────┬───────────────────┘
                               │
                               ▼
                        PipelineReport
