@@ -372,7 +372,9 @@ textarea::placeholder { color: var(--text-mute); }
   gap: 22px;
   animation: fade-up 0.5s ease both;
 }
-.is-hidden { display: none; }
+/* Utility class — use !important so it always wins over component-scoped
+   `display: flex/grid/...` declarations regardless of source order. */
+.is-hidden { display: none !important; }
 .layer-section.is-revealing > * {
   animation: fade-up 0.55s ease both;
 }
