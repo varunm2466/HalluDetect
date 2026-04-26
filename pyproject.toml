@@ -1,0 +1,114 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "halludetect"
+version = "0.1.0"
+description = "Prompt-Aware Detection and Correction of Hallucinated Citations in LLMs"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "AI Safety Engineering" }]
+keywords = ["llm", "hallucination", "citation", "prompt-injection", "rag", "safety"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+dependencies = [
+    "pydantic>=2.7,<3",
+    "pydantic-settings>=2.4",
+    "pyyaml>=6.0",
+    "httpx>=0.27",
+    "tenacity>=9.0",
+    "numpy>=1.26",
+    "rapidfuzz>=3.10",
+    "structlog>=24.4",
+    "rich>=13.9",
+    "typer>=0.12",
+    "python-dotenv>=1.0",
+    "beautifulsoup4>=4.12",
+    "lxml>=5.3",
+    "bibtexparser>=1.4",
+]
+
+[project.optional-dependencies]
+ml = [
+    "torch>=2.2",
+    "transformers>=4.46",
+    "tokenizers>=0.20",
+    "sentence-transformers>=3.0",
+    "safetensors>=0.4",
+    "accelerate>=1.0",
+    "scipy>=1.13",
+]
+retrieval = [
+    "biopython>=1.84",
+    "arxiv>=2.1",
+]
+docs = [
+    "python-docx>=1.1",
+    "pylatexenc>=2.10",
+]
+mcp = [
+    "mcp>=1.0",
+]
+web = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "pytest-cov>=5.0",
+    "ruff>=0.7",
+    "mypy>=1.13",
+    "respx>=0.21",
+    "hypothesis>=6.115",
+]
+all = [
+    "halludetect[ml,retrieval,docs,mcp,web,dev]",
+]
+
+[project.scripts]
+halludetect = "halludetect.cli:app"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+halludetect = ["py.typed", "web/static/*", "web/static/**/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+filterwarnings = [
+    "ignore::DeprecationWarning",
+]
+addopts = "-q --strict-markers"
+markers = [
+    "integration: end-to-end pipeline tests (may hit local-only fixtures)",
+    "network: tests that require live network access",
+    "ml: tests that require torch + transformers",
+]
+
+[tool.ruff]
+line-length = 110
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "C4", "SIM"]
+ignore = ["E501", "B008", "B905", "C408", "SIM108", "SIM117"]
+
+[tool.mypy]
+python_version = "3.10"
+strict_optional = true
+warn_unused_ignores = true
+disallow_untyped_defs = false
+ignore_missing_imports = true

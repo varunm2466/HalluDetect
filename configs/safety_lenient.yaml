@@ -1,0 +1,21 @@
+extends: default.yaml
+
+security:
+  sentinel:
+    block_threshold: 0.95
+  melon:
+    cosine_threshold: 0.40
+
+extraction:
+  entailment:
+    contradiction_threshold: 0.55
+
+scoring:
+  weights:
+    alpha_inj: 0.4
+    beta_uncertainty: 0.2
+    gamma_verification: 0.4
+  policy:
+    preset: lenient
+    auto_apply_min_score: 65.0
+    block_on_injection_prob: 0.8

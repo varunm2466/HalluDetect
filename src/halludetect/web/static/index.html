@@ -1,0 +1,368 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>halludetect — Prompt-Aware Citation Auditor</title>
+    <link rel="stylesheet" href="/static/style.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  </head>
+  <body>
+    <div class="ambient-glow ambient-glow--top"></div>
+    <div class="ambient-glow ambient-glow--bottom"></div>
+
+    <header class="topbar">
+      <div class="topbar__brand">
+        <div class="brand-mark">
+          <span class="brand-mark__dot"></span>
+          <span class="brand-mark__dot"></span>
+          <span class="brand-mark__dot"></span>
+        </div>
+        <div>
+          <div class="brand-name">halludetect</div>
+          <div class="brand-tag">Prompt-Aware Citation Auditor · v0.1</div>
+        </div>
+      </div>
+      <div class="topbar__meta">
+        <span class="status-pill" id="backend-pill">heuristic backend</span>
+        <span class="status-pill status-pill--muted">offline-capable</span>
+      </div>
+    </header>
+
+    <main class="main">
+      <section class="hero">
+        <div class="hero__eyebrow">5-LAYER DETERMINISTIC SAFETY PIPELINE</div>
+        <h1 class="hero__title">
+          Audit any LLM prompt for
+          <span class="grad-text">prompt-injection</span> &
+          <span class="grad-text grad-text--alt">hallucinated citations</span>
+        </h1>
+        <p class="hero__lede">
+          Layer 1 (Sentinel + MELON) screens for adversarial intent.
+          Layers 2–5 verify generated text against authoritative academic registries
+          and produce a quantified Hallucination Risk Score.
+        </p>
+      </section>
+
+      <section class="composer glass-card">
+        <header class="composer__header">
+          <h2>Run an audit</h2>
+          <div class="preset-toggle" role="tablist" aria-label="Safety preset">
+            <button class="preset-toggle__btn is-active" data-preset="default" type="button">Default</button>
+            <button class="preset-toggle__btn" data-preset="strict" type="button">Strict</button>
+            <button class="preset-toggle__btn" data-preset="lenient" type="button">Lenient</button>
+          </div>
+        </header>
+
+        <div class="field">
+          <label for="user-prompt">
+            <span class="field__name">User prompt</span>
+            <span class="field__hint">Sentinel + MELON inspect this for direct & indirect injection.</span>
+          </label>
+          <textarea id="user-prompt" rows="4" placeholder="e.g. Write a related-work paragraph on indirect prompt injection in LLMs and cite real, peer-reviewed sources."></textarea>
+        </div>
+
+        <details class="advanced">
+          <summary>Advanced inputs <span class="advanced__hint">generated text · external context</span></summary>
+          <div class="field">
+            <label for="generated-text">
+              <span class="field__name">LLM-generated response (optional)</span>
+              <span class="field__hint">If present, Layers 2–5 audit the citations within it.</span>
+            </label>
+            <textarea id="generated-text" rows="6" placeholder="Paste the LLM's response — including citations — to audit."></textarea>
+          </div>
+          <div class="field">
+            <label for="external-context">
+              <span class="field__name">External context (optional · one chunk per line)</span>
+              <span class="field__hint">Simulates retrieved web pages / PDFs subject to Indirect Prompt Injection.</span>
+            </label>
+            <textarea id="external-context" rows="4" placeholder="Paste retrieved tool outputs that the LLM was conditioned on."></textarea>
+          </div>
+        </details>
+
+        <div class="composer__actions">
+          <button id="check-btn" class="btn btn--ghost" type="button">
+            <span class="btn__label">Check prompt only</span>
+            <span class="btn__sub">Layer 1 (≈ 0.02s)</span>
+          </button>
+          <button id="audit-btn" class="btn btn--primary" type="button">
+            <span class="btn__label">Run full audit</span>
+            <span class="btn__sub">Layers 1 → 5</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- ════════════ LAYER 1: THREAT REPORT ════════════ -->
+      <section id="threat-section" class="layer-section is-hidden">
+        <div class="layer-header">
+          <div class="layer-header__index">L1</div>
+          <div>
+            <h2 class="layer-header__title">Adversarial Threat Detection</h2>
+            <p class="layer-header__sub">Sentinel direct-injection classifier · MELON contrastive masked re-execution</p>
+          </div>
+          <div class="layer-header__time" id="threat-time"></div>
+        </div>
+
+        <div class="threat-grid">
+          <div class="glass-card big-verdict" id="big-verdict">
+            <div class="big-verdict__label">VERDICT</div>
+            <div class="big-verdict__value" id="big-verdict-value">—</div>
+            <div class="big-verdict__sub" id="big-verdict-sub">awaiting evaluation</div>
+            <div class="pinj-bar">
+              <div class="pinj-bar__track">
+                <div class="pinj-bar__fill" id="pinj-fill"></div>
+              </div>
+              <div class="pinj-bar__legend">
+                <span>P_inj</span>
+                <span id="pinj-value">0.000</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="glass-card signal-card">
+            <div class="signal-card__head">
+              <span class="signal-card__icon">⚡</span>
+              <span class="signal-card__name">Sentinel</span>
+              <span class="signal-card__pill" id="sentinel-backend-pill">offline</span>
+            </div>
+            <div class="signal-card__metric">
+              <span class="signal-card__metric-name">label</span>
+              <span class="signal-card__metric-value" id="sentinel-label">—</span>
+            </div>
+            <div class="signal-card__metric">
+              <span class="signal-card__metric-name">confidence</span>
+              <span class="signal-card__metric-value mono" id="sentinel-score">—</span>
+            </div>
+            <div class="signal-card__hits" id="sentinel-hits"></div>
+          </div>
+
+          <div class="glass-card signal-card">
+            <div class="signal-card__head">
+              <span class="signal-card__icon">🛡</span>
+              <span class="signal-card__name">MELON</span>
+              <span class="signal-card__pill" id="melon-status-pill">idle</span>
+            </div>
+            <div class="signal-card__metric">
+              <span class="signal-card__metric-name">cosine sim</span>
+              <span class="signal-card__metric-value mono" id="melon-cosine">—</span>
+            </div>
+            <div class="signal-card__metric">
+              <span class="signal-card__metric-name">threshold</span>
+              <span class="signal-card__metric-value mono" id="melon-threshold">0.10</span>
+            </div>
+            <div class="signal-card__metric">
+              <span class="signal-card__metric-name">aborted</span>
+              <span class="signal-card__metric-value mono" id="melon-aborted">—</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="threat-action is-hidden" id="threat-action">
+          <p id="threat-action-text">Sentinel/MELON flagged this prompt as adversarial. Layers 2–5 will short-circuit if you proceed.</p>
+          <button class="btn btn--ghost btn--small" id="proceed-anyway-btn" type="button">Run full audit anyway</button>
+        </div>
+      </section>
+
+      <!-- ════════════ FULL PIPELINE RESULTS ════════════ -->
+      <section id="pipeline-section" class="layer-section is-hidden">
+        <div class="layer-header">
+          <div class="layer-header__index">L2-L5</div>
+          <div>
+            <h2 class="layer-header__title">Verification &amp; Scoring</h2>
+            <p class="layer-header__sub">Atomic claim extraction · multi-source retrieval · record linkage · HRS scoring</p>
+          </div>
+        </div>
+
+        <div class="score-row">
+          <div class="glass-card score-card">
+            <div class="score-card__label">HALLUCINATION RISK SCORE</div>
+            <div class="score-gauge">
+              <svg viewBox="0 0 200 120" class="score-gauge__svg">
+                <defs>
+                  <linearGradient id="gaugeGrad" x1="0" x2="1" y1="0" y2="0">
+                    <stop offset="0" stop-color="#ff5d73" />
+                    <stop offset="0.5" stop-color="#f5b04c" />
+                    <stop offset="1" stop-color="#3ddc97" />
+                  </linearGradient>
+                </defs>
+                <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="rgba(255,255,255,0.07)" stroke-width="14" stroke-linecap="round" />
+                <path id="score-arc" d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="url(#gaugeGrad)" stroke-width="14" stroke-linecap="round" stroke-dasharray="251.3" stroke-dashoffset="251.3" />
+              </svg>
+              <div class="score-gauge__value">
+                <span id="score-value">—</span>
+                <span class="score-gauge__unit">/ 100</span>
+              </div>
+            </div>
+            <div class="score-card__interpretation" id="score-interpretation">awaiting audit…</div>
+            <div class="score-card__weights" id="score-weights"></div>
+          </div>
+
+          <div class="glass-card meter-card">
+            <h3>HRS Components</h3>
+            <div class="meter">
+              <div class="meter__row">
+                <span class="meter__name">α · P_inj <span class="meter__hint">injection probability</span></span>
+                <span class="meter__value mono" id="meter-pinj">—</span>
+              </div>
+              <div class="meter__bar">
+                <div class="meter__fill meter__fill--red" id="meter-pinj-fill"></div>
+              </div>
+            </div>
+            <div class="meter">
+              <div class="meter__row">
+                <span class="meter__name">β · U_intrinsic <span class="meter__hint">model uncertainty</span></span>
+                <span class="meter__value mono" id="meter-u">—</span>
+              </div>
+              <div class="meter__bar">
+                <div class="meter__fill meter__fill--amber" id="meter-u-fill"></div>
+              </div>
+            </div>
+            <div class="meter">
+              <div class="meter__row">
+                <span class="meter__name">γ · V_extrinsic <span class="meter__hint">verified-claim ratio</span></span>
+                <span class="meter__value mono" id="meter-v">—</span>
+              </div>
+              <div class="meter__bar">
+                <div class="meter__fill meter__fill--green" id="meter-v-fill"></div>
+              </div>
+            </div>
+            <div class="formula mono" id="formula">
+              S<sub>safety</sub> = 100 · clip(1 − α·P_inj − β·U_intrinsic + γ·V_extrinsic, 0, 1)
+            </div>
+          </div>
+        </div>
+
+        <div class="layer-cards">
+          <article class="glass-card layer-card" id="layer-card-l2">
+            <header class="layer-card__head">
+              <span class="layer-card__index">L2</span>
+              <span class="layer-card__title">Granular Claim Extraction</span>
+              <span class="layer-card__time mono"></span>
+            </header>
+            <div class="layer-card__body">
+              <div class="kv">
+                <span class="kv__key">Triplets extracted</span>
+                <span class="kv__val mono" data-key="claims">—</span>
+              </div>
+              <div class="kv">
+                <span class="kv__key">Citations detected</span>
+                <span class="kv__val mono" data-key="citations">—</span>
+              </div>
+            </div>
+          </article>
+
+          <article class="glass-card layer-card" id="layer-card-l3">
+            <header class="layer-card__head">
+              <span class="layer-card__index">L3</span>
+              <span class="layer-card__title">Multi-Agent Retrieval</span>
+              <span class="layer-card__time mono"></span>
+            </header>
+            <div class="layer-card__body">
+              <div class="kv">
+                <span class="kv__key">Citations queried</span>
+                <span class="kv__val mono" data-key="queried">—</span>
+              </div>
+              <div class="layer-card__sources">
+                <span class="src-pill">Crossref</span>
+                <span class="src-pill">arXiv</span>
+                <span class="src-pill">Semantic Scholar</span>
+                <span class="src-pill">PubMed</span>
+                <span class="src-pill">Liveness · Wayback</span>
+              </div>
+            </div>
+          </article>
+
+          <article class="glass-card layer-card" id="layer-card-l4">
+            <header class="layer-card__head">
+              <span class="layer-card__index">L4</span>
+              <span class="layer-card__title">Record Linkage</span>
+              <span class="layer-card__time mono"></span>
+            </header>
+            <div class="layer-card__body">
+              <div class="kv">
+                <span class="kv__key">Verdicts produced</span>
+                <span class="kv__val mono" data-key="verdicts">—</span>
+              </div>
+              <div class="layer-card__sources">
+                <span class="src-pill src-pill--alt">Enhanced Jaro-Winkler</span>
+                <span class="src-pill src-pill--alt">Rabin-Karp</span>
+                <span class="src-pill src-pill--alt">Manifestation hierarchy</span>
+              </div>
+            </div>
+          </article>
+
+          <article class="glass-card layer-card" id="layer-card-l5">
+            <header class="layer-card__head">
+              <span class="layer-card__index">L5</span>
+              <span class="layer-card__title">Scoring &amp; Correction</span>
+              <span class="layer-card__time mono"></span>
+            </header>
+            <div class="layer-card__body">
+              <div class="kv">
+                <span class="kv__key">Auto-apply patches</span>
+                <span class="kv__val mono" data-key="auto">—</span>
+              </div>
+              <div class="kv">
+                <span class="kv__key">Manual-review patches</span>
+                <span class="kv__val mono" data-key="manual">—</span>
+              </div>
+            </div>
+          </article>
+        </div>
+
+        <div class="glass-card verdicts-card" id="verdicts-card">
+          <h3>Per-citation verdicts</h3>
+          <table class="verdicts-table">
+            <thead>
+              <tr>
+                <th>Citation</th>
+                <th>Verdict</th>
+                <th>Best match</th>
+                <th class="num">Sim</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="verdicts-tbody">
+              <tr class="empty"><td colspan="5">No citations to audit yet.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="examples">
+        <h3>Try a preset</h3>
+        <div class="examples__grid">
+          <button class="example-card" data-example="benign" type="button">
+            <div class="example-card__pill example-card__pill--green">benign</div>
+            <div class="example-card__title">Standard scholarly request</div>
+            <div class="example-card__sub">Will pass L1 and continue through L2–L5 with retrieval.</div>
+          </button>
+          <button class="example-card" data-example="direct" type="button">
+            <div class="example-card__pill example-card__pill--red">direct injection</div>
+            <div class="example-card__title">"IGNORE ALL PREVIOUS INSTRUCTIONS…"</div>
+            <div class="example-card__sub">Caught by Sentinel — pipeline short-circuits.</div>
+          </button>
+          <button class="example-card" data-example="indirect" type="button">
+            <div class="example-card__pill example-card__pill--red">indirect injection</div>
+            <div class="example-card__title">Poisoned external context</div>
+            <div class="example-card__sub">Caught by MELON contrastive masked re-execution.</div>
+          </button>
+          <button class="example-card" data-example="hallucinated" type="button">
+            <div class="example-card__pill example-card__pill--amber">hallucinated citation</div>
+            <div class="example-card__title">Fabricated 2099 paper</div>
+            <div class="example-card__sub">Layer 4 flags non-existent DOI / unmatched record.</div>
+          </button>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div>halludetect · Prompt-Aware Hallucinated Citation Detection</div>
+      <div class="mono">5 layers · MIT</div>
+    </footer>
+
+    <script src="/static/app.js"></script>
+  </body>
+</html>
